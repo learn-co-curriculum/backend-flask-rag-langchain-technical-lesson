@@ -169,13 +169,13 @@ backend-flask-rag-langchain-technical-lesson/
 
 ---
 
-# Instructions
+## Instructions
 
 Follow the technical process: **Identify → Assemble → Execute → Verify**.
 
 ---
 
-## Step 1: Identify the RAG API goal and output contract
+### Step 1: Identify the RAG API goal and output contract
 
 To start, we'll define what the backend needs to do before you choose LangChain components.
 
@@ -196,7 +196,7 @@ Reliability runbook chunks stored in data/runbook_chunks.json and seeded into Ch
 Endpoint route:
 POST /api/ask
 
-Manual RAG steps this replaces:
+Manual RAG steps this LangChain version organizes:
 Validate question, retrieve context, build prompt, call model, parse output, return answer and sources.
 
 Expected successful response fields:
@@ -209,13 +209,11 @@ LangChain debug fields that would help a developer:
 component names, chain expression, retrieved chunk IDs, retrieved count, top_k, context length, fallback status, model names.
 ```
 
-### Why This Step Matters
-
 LangChain should not hide the workflow from you. Before you build the chain, you should be able to explain what problem the backend solves and what output the frontend needs.
 
 ---
 
-## Step 2: Assemble the manual-to-LangChain map
+### Step 2: Assemble the manual-to-LangChain map
 
 Next, let's connect the RAG steps you already know to LangChain components.
 
@@ -232,19 +230,17 @@ Review this component map:
 | Connect prompt → model → parser | Chain expression using `|` |
 | Return answer and source metadata | Flask response formatter |
 
-### Explanation
-
 This lesson uses LangChain where it helps organize the workflow, but it keeps important backend responsibilities visible. Flask still validates requests. Chroma still stores and retrieves chunks. The response formatter still controls what the frontend receives.
 
 ---
 
-## Step 3: Assemble the LangChain Chroma vector store
+### Step 3: Assemble the LangChain Chroma vector store
 
 Next, let's configure the embedding model and vector store that LangChain uses for retrieval.
 
 Open `lib/vector_store.py`.
 
-Replace `build_embedding_model()` with:
+Find the `build_embedding_model()` function. This helper should create the embedding model wrapper that LangChain will use whenever it stores runbook chunks or embeds a user question for retrieval. Configure `OllamaEmbeddings` with the model name and base URL from `lib/config.py`:
 
 ```python
 def build_embedding_model():
@@ -255,7 +251,7 @@ def build_embedding_model():
     )
 ```
 
-Replace `get_vector_store()` with:
+Now find the `get_vector_store()` function. This helper should return the Chroma collection that stores the runbook vectors. Connect the collection name, database path, and embedding function so LangChain knows where the vector data lives and how new text should be embedded:
 
 ```python
 def get_vector_store():
@@ -267,11 +263,9 @@ def get_vector_store():
     )
 ```
 
-### Explanation
-
 `OllamaEmbeddings` tells LangChain how to turn text into vectors. `Chroma` stores those vectors and the related runbook metadata. This is the same retrieval idea from earlier modules, but now the vector database is wrapped in a LangChain interface.
 
-### Check Your Work
+#### Check Your Work
 
 Your file should still import:
 
@@ -282,11 +276,13 @@ from langchain_ollama import OllamaEmbeddings
 
 ---
 
-## Step 4: Add retriever and seeding behavior
+### Step 4: Add retriever and seeding behavior
 
 Now, we will create a retriever helper and seed the Chroma database with a new runbook dataset.
 
-In `lib/vector_store.py`, replace `get_retriever()` with:
+Open `lib/vector_store.py` again.
+
+Find the `get_retriever()` function. Give it two optional inputs: a vector store and the number of results to retrieve. Inside the function, use the provided vector store when one is passed in. Otherwise, create the default Chroma vector store. Then return a LangChain retriever configured with `top_k`:
 
 ```python
 def get_retriever(vector_store=None, top_k=DEFAULT_TOP_K):
@@ -295,7 +291,7 @@ def get_retriever(vector_store=None, top_k=DEFAULT_TOP_K):
     return store.as_retriever(search_kwargs={"k": top_k})
 ```
 
-Replace `seed_vector_store()` with:
+Next, find the `seed_vector_store()` function. This function prepares the local Chroma database for the lesson. It should clear old Chroma data when `reset=True`, load the reliability runbook documents, use each document's `chunk_id` as its stable ID, add the documents to Chroma, persist the database when supported, and return the number of documents added:
 
 ```python
 def seed_vector_store(reset=True):
@@ -315,8 +311,6 @@ def seed_vector_store(reset=True):
     return len(documents)
 ```
 
-### Explanation
-
 The retriever helper shows the common LangChain pattern:
 
 ```python
@@ -325,9 +319,7 @@ vector_store.as_retriever(search_kwargs={"k": top_k})
 
 The seed function loads runbook chunks, converts them into LangChain `Document` objects, and stores them in Chroma. Each document includes `page_content` and `metadata`, which matters later when the API returns sources.
 
-### Execute the Seed File
-
-Seed the database:
+Now, let's seed the database:
 
 ```bash
 python seed_chroma.py
@@ -339,7 +331,7 @@ Expected output:
 Seeded 12 reliability runbook chunks into Chroma.
 ```
 
-### Common Issue
+#### Common Issue
 
 If seeding fails with an Ollama connection error, make sure Ollama is running and the embedding model is available:
 
@@ -350,13 +342,13 @@ ollama list
 
 ---
 
-## Step 5: Assemble the prompt template
+### Step 5: Assemble the prompt template
 
-Next, we will replace a manual prompt string with a reusable LangChain prompt template.
+Next, we will move the manual prompt structure into a reusable LangChain prompt template.
 
 Open `lib/prompt_templates.py`.
 
-Replace `build_prompt_template()` with:
+Find the `build_prompt_template()` function. This helper should create a chat prompt with two messages: a `system` message for the assistant rules and a `human` message for the retrieved context and user question. Build the prompt from the existing `SYSTEM_INSTRUCTIONS` and `HUMAN_TEMPLATE` strings:
 
 ```python
 def build_prompt_template():
@@ -369,11 +361,7 @@ def build_prompt_template():
     )
 ```
 
-### Explanation
-
 A prompt template keeps the instruction structure reusable. Instead of manually building a long string in a route, the chain can fill `{context}` and `{question}` when it runs.
-
-### Check Your Work
 
 The human template should include both variables:
 
@@ -386,13 +374,13 @@ If either variable is missing, the chain will not receive the retrieved context 
 
 ---
 
-## Step 6: Format sources and LangChain debug metadata
+### Step 6: Format sources and LangChain debug metadata
 
 Now, we need to shape the API response so users can inspect sources and developers can inspect LangChain behavior.
 
 Open `lib/response_formatter.py`.
 
-Replace `format_sources()` with:
+Find the `format_sources()` function. This helper receives Chroma results as `(document, distance)` pairs. Build a list of source dictionaries from each document's metadata, skip duplicate `chunk_id` values, round the distance for easier inspection, and avoid returning the full document text in the API response:
 
 ```python
 def format_sources(scored_documents):
@@ -423,7 +411,7 @@ def format_sources(scored_documents):
     return sources
 ```
 
-Replace `format_langchain_debug()` with:
+Next, find the `format_langchain_debug()` function. This helper should make the LangChain workflow visible for learning and troubleshooting. It collects the retrieved chunk IDs, names the main LangChain components, records how much context was passed into the prompt, and marks whether the response used fallback behavior:
 
 ```python
 def format_langchain_debug(
@@ -461,7 +449,7 @@ def format_langchain_debug(
     }
 ```
 
-Replace `format_success_response()` with:
+Now find the `format_success_response()` function. This helper should create the response body for a successful RAG answer. Trim extra whitespace from the model answer, then return the answer, sources, and LangChain debug object together:
 
 ```python
 def format_success_response(answer, sources, langchain_debug):
@@ -473,7 +461,7 @@ def format_success_response(answer, sources, langchain_debug):
     }
 ```
 
-Replace `format_fallback_response()` with:
+Finally, find the `format_fallback_response()` function. This helper should return a safe answer when the system does not have enough approved context. Keep the `sources` list empty and include fallback metadata so the frontend or developer can tell that the model was not used for a grounded answer:
 
 ```python
 def format_fallback_response(langchain_debug=None):
@@ -485,23 +473,21 @@ def format_fallback_response(langchain_debug=None):
     }
 ```
 
-### Explanation
-
 The source formatter keeps full document text out of the API response while still returning enough metadata for review. The `langchain` debug object makes the abstraction visible: learners can see which components ran, how many chunks were retrieved, and whether the system used fallback behavior.
 
-### Production Note
+#### Production Note
 
 In a production app, you might hide debug metadata behind a developer flag. In this lesson, the metadata is intentionally visible because it helps you inspect the pipeline.
 
 ---
 
-## Step 7: Execute the LangChain RAG service
+### Step 7: Execute the LangChain RAG service
 
 Next, let's compose the prompt, model, parser, retrieval, fallback, and response formatting into one service function.
 
 Open `lib/langchain_rag_service.py`.
 
-Replace `build_chat_model()` with:
+Find the `build_chat_model()` function. This helper should create the LangChain wrapper around your local Ollama generation model. Configure it with the generation model name, Ollama base URL, and temperature from `lib/config.py`:
 
 ```python
 def build_chat_model():
@@ -513,7 +499,7 @@ def build_chat_model():
     )
 ```
 
-Replace `build_chain()` with:
+Find the `build_chain()` function. This helper should connect three LangChain components: the prompt template, the chat model, and the string output parser. The `|` operator passes the output of one component into the next one:
 
 ```python
 def build_chain(prompt_template=None, llm=None):
@@ -524,7 +510,7 @@ def build_chain(prompt_template=None, llm=None):
     return prompt_template | llm | StrOutputParser()
 ```
 
-Replace `retrieve_context()` with:
+Find the `retrieve_context()` function. This helper should ask Chroma for the most relevant runbook chunks and include similarity scores in the result. Use `question.strip()` so extra spaces do not become part of the retrieval query:
 
 ```python
 def retrieve_context(question, vector_store=None, top_k=DEFAULT_TOP_K):
@@ -533,7 +519,7 @@ def retrieve_context(question, vector_store=None, top_k=DEFAULT_TOP_K):
     return store.similarity_search_with_score(question.strip(), k=top_k)
 ```
 
-Replace `has_usable_context()` with:
+Find the `has_usable_context()` function. This helper should check whether retrieval returned at least one document with non-empty text. This gives the service a clear place to decide whether it has enough context to continue:
 
 ```python
 def has_usable_context(scored_documents):
@@ -545,7 +531,7 @@ def has_usable_context(scored_documents):
     return False
 ```
 
-Replace `format_context()` with:
+Find the `format_context()` function. This helper should convert the retrieved LangChain `Document` objects into a readable context block for the prompt. Include source metadata next to each chunk so the model receives the text with useful labels, while the backend still controls source formatting separately:
 
 ```python
 def format_context(scored_documents):
@@ -574,7 +560,9 @@ def format_context(scored_documents):
     return "\n\n".join(context_blocks)
 ```
 
-Replace `answer_question()` with:
+Now find the `answer_question()` function. This is the main orchestration function for the RAG workflow. It should clean the question, retrieve scored documents, return a safe fallback when no usable context is found, format the retrieved context, run the LangChain chain, verify that the model returned a usable string, and then format the final response with sources and debug metadata.
+
+The optional `vector_store` and `chain` parameters make the function easier to test because a test can pass in fake objects instead of calling the real database or model:
 
 ```python
 def answer_question(
@@ -644,13 +632,13 @@ The backend still owns the important application decisions around retrieval, fal
 
 ---
 
-## Step 8: Connect the LangChain service to Flask
+### Step 8: Connect the LangChain service to Flask
 
 Now, we'll expose the LangChain RAG service through `POST /api/ask`.
 
 Open `lib/validation.py`.
 
-Replace `validate_question_payload()` with:
+Find the `validate_question_payload()` function. This helper should protect the API from invalid requests before the backend sends anything into retrieval or the model. Check the request body in order: it must be a JSON object, it must include a `question` field, the question must be a string, it cannot be blank, and it must meet the minimum length. Return `(question, None)` when the input is valid, or `(None, error_dict)` when it is not:
 
 ```python
 def validate_question_payload(payload):
@@ -699,7 +687,7 @@ def validate_question_payload(payload):
 
 Open `app.py`.
 
-Replace the `/api/ask` route body with:
+Find the `ask()` route inside `create_app()`. Keep the `@app.post("/api/ask")` decorator and the `ask()` function name. Inside the function, get the JSON body, validate the question, call the LangChain RAG service, return the successful response as JSON, and convert service failures into a structured `502` error:
 
 ```python
     @app.post("/api/ask")
@@ -739,7 +727,7 @@ It does not build prompts, retrieve documents, or call the model directly. That 
 
 ---
 
-## Step 9: Execute the app
+### Step 9: Execute the app
 
 Now, we can run the full local RAG stack.
 
@@ -763,8 +751,6 @@ curl -i -X POST http://127.0.0.1:5000/api/ask \
   -d '{"question": "What should I do if checkout API errors spike right after a release?"}'
 ```
 
-### Expected Result
-
 You should receive:
 
 - HTTP `200`
@@ -776,19 +762,16 @@ Your exact wording may differ because the generation model is probabilistic, but
 
 ---
 
-## Step 10: Verify the pipeline without Flask
+### Step 10: Verify the pipeline without Flask
 
 Let's confirm that LangChain can run in plain Python as well as inside Flask.
 
-### Action
-
-Run:
+In a new terminal, run:
 
 ```bash
+pipenv shell
 python try_langchain_rag.py "When should we publish a status page update?"
 ```
-
-### Expected Result
 
 The script should print JSON with:
 
@@ -798,13 +781,11 @@ sources
 langchain
 ```
 
-### Explanation
-
 Flask is the API boundary. LangChain is the AI workflow layer. The same service can run from a route, a CLI script, a scheduled job, or another backend component.
 
 ---
 
-## Step 11: Verify behavior with smoke tests
+### Step 11: Verify behavior with smoke tests
 
 Next, we'll use the prebuilt tests to check the core behavior after completing the lesson.
 
@@ -823,13 +804,13 @@ The included tests check that:
 - fallback behavior does not call the model when no context exists,
 - the Flask route returns a structured JSON response.
 
-### Important Note
+#### Important Note
 
-These tests use fakes where possible. They do not require a live Ollama model. Manual `curl` checks are still important because they verify the real local model and Chroma database.
+These tests use mocks where possible. They do not require a live Ollama model. Manual `curl` checks are still important because they verify the real local model and Chroma database.
 
 ---
 
-## Step 12: Verify with multiple realistic questions
+### Step 12: Verify with multiple realistic questions
 
 Try these questions:
 
@@ -881,7 +862,7 @@ Would a React frontend be able to display answer, sources, and optional diagnost
 
 ---
 
-## Step 13: Reflect on LangChain’s value and tradeoffs
+### Step 13: Reflect on LangChain’s value and tradeoffs
 
 Open `planning_notes.md` and complete the reflection section.
 
@@ -902,11 +883,11 @@ LangChain made the prompt, model, and output parser easier to compose. The debug
 
 ---
 
-# Completed Code Reference
+## Completed Code Reference
 
 Use this section when you need to check your implementation.
 
-## `lib/vector_store.py`
+### `lib/vector_store.py`
 
 ```python
 """LangChain + Chroma setup helpers for the technical lesson."""
@@ -974,7 +955,7 @@ def seed_vector_store(reset=True):
     return len(documents)
 ```
 
-## `lib/prompt_templates.py`
+### `lib/prompt_templates.py`
 
 ```python
 """Prompt templates for the LangChain RAG pipeline."""
@@ -1015,7 +996,7 @@ def build_prompt_template():
     )
 ```
 
-## `lib/response_formatter.py`
+### `lib/response_formatter.py`
 
 ```python
 """Response formatting helpers for source-backed LangChain RAG output."""
@@ -1114,7 +1095,7 @@ def format_error_response(error, message):
     return {"error": error, "message": message}
 ```
 
-## `lib/langchain_rag_service.py`
+### `lib/langchain_rag_service.py`
 
 ```python
 """LangChain RAG service for retrieval, prompt execution, and response formatting."""
@@ -1250,7 +1231,7 @@ def answer_question(
         raise LangChainServiceError(str(exc)) from exc
 ```
 
-## `lib/validation.py`
+### `lib/validation.py`
 
 ```python
 """Request validation helpers for POST /api/ask."""
@@ -1302,7 +1283,7 @@ def validate_question_payload(payload):
     return question, None
 ```
 
-## `app.py`
+### `app.py`
 
 ```python
 """Flask API for the LangChain RAG technical lesson."""
@@ -1352,7 +1333,7 @@ if __name__ == "__main__":
 
 ---
 
-# Common Issues and Fixes
+## Common Issues and Fixes
 
 | Issue | What it looks like | How to fix it |
 |---|---|---|
@@ -1367,7 +1348,7 @@ if __name__ == "__main__":
 
 ---
 
-# Success Criteria
+## Success Criteria
 
 Your completed technical lesson project should:
 
@@ -1388,7 +1369,7 @@ Your completed technical lesson project should:
 
 ---
 
-# Extension Ideas
+## Extension Ideas
 
 After you complete the lesson, try one extension:
 
