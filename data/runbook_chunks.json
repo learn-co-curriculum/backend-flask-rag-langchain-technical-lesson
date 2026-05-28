@@ -1,0 +1,98 @@
+[
+  {
+    "chunk_id": "chunk-rel-101-a",
+    "source_id": "REL-101",
+    "title": "Checkout API Error Spike Runbook",
+    "category": "Reliability",
+    "section": "First Ten Minutes",
+    "text": "When checkout API 5xx errors rise above the alert threshold after a release, the on-call engineer should acknowledge the incident, check the deployment dashboard, compare the error rate to the previous stable release, and review recent application logs. If the spike started within fifteen minutes of the release, treat the release as the likely cause until another cause is confirmed."
+  },
+  {
+    "chunk_id": "chunk-rel-101-b",
+    "source_id": "REL-101",
+    "title": "Checkout API Error Spike Runbook",
+    "category": "Reliability",
+    "section": "Mitigation",
+    "text": "For a confirmed checkout API regression, pause additional deployments and prepare a rollback to the previous stable version. Notify the incident channel before the rollback begins. After rollback, watch the 5xx rate, checkout latency, and order completion rate for at least ten minutes before lowering severity."
+  },
+  {
+    "chunk_id": "chunk-rel-102-a",
+    "source_id": "REL-102",
+    "title": "Rollback Procedure",
+    "category": "Reliability",
+    "section": "Decision Criteria",
+    "text": "A rollback is appropriate when a recent release causes customer-impacting errors, data loss risk, failed payments, or a clear drop in successful requests. The incident lead should record the rollback reason and link the deployment version in the incident notes."
+  },
+  {
+    "chunk_id": "chunk-rel-102-b",
+    "source_id": "REL-102",
+    "title": "Rollback Procedure",
+    "category": "Reliability",
+    "section": "Execution Steps",
+    "text": "To roll back an application release, select the previous stable version in the deployment dashboard, confirm the target environment, and start the rollback. Do not merge unrelated fixes during the rollback. After the rollback completes, verify health checks, error rate, and the primary user workflow."
+  },
+  {
+    "chunk_id": "chunk-obs-144-a",
+    "source_id": "OBS-144",
+    "title": "Alert Severity Guide",
+    "category": "Observability",
+    "section": "Severity Levels",
+    "text": "Use severity P1 for incidents that block checkout, login, payments, data access, or other critical workflows for many users. Use P2 when a major workflow is degraded but a workaround exists. Use P3 for limited impact issues that can wait for normal business hours."
+  },
+  {
+    "chunk_id": "chunk-com-210-a",
+    "source_id": "COM-210",
+    "title": "Status Page Communication",
+    "category": "Communications",
+    "section": "Customer Updates",
+    "text": "For P1 and P2 incidents, publish an initial status page update after impact is confirmed. The update should describe the affected service, user impact, current mitigation, and the next expected update time. Do not include internal stack traces, customer names, or unconfirmed root cause claims."
+  },
+  {
+    "chunk_id": "chunk-com-210-b",
+    "source_id": "COM-210",
+    "title": "Status Page Communication",
+    "category": "Communications",
+    "section": "Resolution Updates",
+    "text": "When an incident is resolved, the final status update should state that service has recovered, summarize the customer-visible impact, and mention that a review will follow. Avoid promising compensation, credits, or exact root cause details unless approved by the incident lead."
+  },
+  {
+    "chunk_id": "chunk-sec-201-a",
+    "source_id": "SEC-201",
+    "title": "API Key Exposure Response",
+    "category": "Security",
+    "section": "Triage",
+    "text": "If an API key is exposed in a public repository, revoke the exposed key, generate a replacement key, and review access logs for unusual use. Notify the security channel with the repository link, exposure window, and systems the key could access."
+  },
+  {
+    "chunk_id": "chunk-sec-201-b",
+    "source_id": "SEC-201",
+    "title": "API Key Exposure Response",
+    "category": "Security",
+    "section": "Follow Up",
+    "text": "After revoking an exposed key, add a secret scanning rule if one does not already exist. Rotate any related tokens that share the same permissions. Document the incident, owner, and prevention step in the security tracking system."
+  },
+  {
+    "chunk_id": "chunk-lim-220-a",
+    "source_id": "LIM-220",
+    "title": "Rate Limit Troubleshooting",
+    "category": "Platform",
+    "section": "Support Guidance",
+    "text": "When a customer reports rate limit errors, confirm the endpoint, account plan, time window, and response headers. Advise the customer to use exponential backoff and avoid retry loops that immediately repeat failed requests."
+  },
+  {
+    "chunk_id": "chunk-data-310-a",
+    "source_id": "DATA-310",
+    "title": "Data Export Delay Notes",
+    "category": "Data Operations",
+    "section": "Expected Timing",
+    "text": "Large data exports may take up to four hours during peak processing windows. Support should verify the requester is an account admin before discussing export details. Escalate only if the export has been pending for more than four hours."
+  },
+  {
+    "chunk_id": "chunk-bill-112-a",
+    "source_id": "BILL-112",
+    "title": "Refund Escalation Policy",
+    "category": "Billing",
+    "section": "Escalation",
+    "text": "Refund requests for enterprise customers require billing manager review. Support agents should collect the invoice number, account ID, request reason, and customer impact before creating the escalation ticket."
+  }
+]
