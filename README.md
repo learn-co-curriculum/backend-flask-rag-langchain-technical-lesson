@@ -141,7 +141,7 @@ pip install -r requirements.txt
 ## Project Structure
 
 ```text
-m6-langchain-rag-technical-lesson/
+backend-flask-rag-langchain-technical-lesson/
 ├── app.py
 ├── seed_chroma.py
 ├── try_langchain_rag.py
